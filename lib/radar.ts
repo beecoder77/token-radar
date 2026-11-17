@@ -363,6 +363,13 @@ export const FARM_TEMPLATES: Record<string, string[]> = {
     'Do not lock large funds here: {name} is a liquid-staking product, and its receipt token is a claim on an asset that already trades, so treat this as low priority. (no cost; about 5 minutes)',
     'Re-check the announcements once a month; if a points program or token plan appears, switch to a full farm plan and move the position up the list. (no fee; 10 minutes a month)',
   ],
+  monitor: [
+    'Set up a fresh wallet on {chain} that holds only the funds you plan to farm, and write its seed phrase on paper, never in a screenshot. ($2–$4 in gas; about 10 minutes)',
+    'Make one small test interaction, about {small}, with {name} on {chain} so the wallet has one completed transaction on record. ($2–$6 in gas; about 10 minutes)',
+    'Turn on {name}\u2019s official announcements channel and set an alert for the words token, airdrop and points. (no fee; about 5 minutes)',
+    'Do not lock large funds here: {reason}, so treat this as low priority and keep most capital in likely launch candidates. (no cost; about 5 minutes)',
+    'Re-check the announcements once a month; if a points program or token plan appears, switch to a full farm plan and move the position up the list. (no fee; 10 minutes a month)',
+  ],
 };
 
 /** The template group a category belongs to. */
@@ -370,7 +377,8 @@ export function groupFor(category: string | null, discount: number): string {
   if (discount < 1) {
     if (category === 'CEX') return 'cex';
     if (category === 'Bridge' || category === 'Canonical Bridge' || category === 'Cross Chain Bridge') return 'bridge';
-    return 'lst';
+    if (category === 'Liquid Staking' || category === 'Liquid Restaking' || category === 'Restaked BTC') return 'lst';
+    return 'monitor';
   }
   const c = (category ?? '').toLowerCase();
   if (c.includes('dex') || c.includes('leveraged farm') || c.includes('liquidity manager') || c === 'farm') return 'dexs';
@@ -409,6 +417,7 @@ export function farmSteps(p: SnapshotProtocol, breakdown: ModelBreakdown): strin
     range: tier.range,
     hold: String(holdDaysFor(breakdown.age_days)),
     small: '$25',
+    reason: breakdown.discount_reason,
   };
   const group = groupFor(p.category, breakdown.discount);
   const templates = FARM_TEMPLATES[group] ?? FARM_TEMPLATES.generic!;

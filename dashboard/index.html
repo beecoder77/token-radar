@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Radar — pre-token protocols ranked by implied value</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">&#9679;</span>
+      <div>
+        <h1>Token Radar</h1>
+        <p class="tagline">Every protocol that records no token, ranked by what its token would be worth.</p>
+      </div>
+    </div>
+    <dl class="stats" id="stats"></dl>
+  </div>
+</header>
+<main class="wrap">
+  <section id="board-view">
+    <div class="controls" id="controls">
+      <label class="ctl search">Search
+        <input id="q" type="search" placeholder="Name or slug…" autocomplete="off">
+      </label>
+      <label class="ctl">Category
+        <select id="f-cat"></select>
+      </label>
+      <label class="ctl">Chain
+        <select id="f-chain"></select>
+      </label>
+      <label class="ctl">Min TVL
+        <select id="f-tvl">
+          <option value="0">Any</option>
+          <option value="500000000">$500M+</option>
+          <option value="100000000">$100M+</option>
+          <option value="50000000">$50M+</option>
+          <option value="10000000">$10M+</option>
+        </select>
+      </label>
+      <label class="check"><input id="f-watch" type="checkbox"> Watchlist only</label>
+      <label class="check"><input id="f-likely" type="checkbox"> Likely to launch</label>
+      <span class="count" id="count"></span>
+    </div>
+    <p class="hint">Click a column header to sort. Click a row for the protocol&rsquo;s value breakdown, farm plan and comparable peers.</p>
+    <div class="tablewrap">
+      <table id="board">
+        <thead>
+          <tr>
+            <th data-sort="rank" class="num">Rank</th>
+            <th data-sort="name">Protocol</th>
+            <th data-sort="category">Category</th>
+            <th data-sort="chains">Chains</th>
+            <th data-sort="tvl_usd" class="num">TVL</th>
+            <th data-sort="change_7d" class="num">7d</th>
+            <th data-sort="age_days" class="num">Age</th>
+            <th data-sort="implied_value_usd" class="num">Implied value</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <section class="explainer" id="how">
+      <h2>How the value is computed</h2>
+      <p>Each protocol&rsquo;s implied value comes from the snapshot itself, never from a
+      hand-picked list of names. The market already prices token-bearing protocols:
+      for every category we take the <strong>median market-cap / TVL ratio</strong> of the
+      protocols in that category that have a token (at least 3 peers, otherwise the
+      global median of 0.1689), and multiply the protocol&rsquo;s TVL by it. That base is
+      then adjusted for its 7-day TVL growth, for how long it has run with no token,
+      and for how many chains it runs on. Categories that almost certainly never
+      issue a token — exchanges, bridges, liquid-staking products — and versioned
+      or wrapped names are discounted hard, so they sink instead of pretending to
+      be farmable.</p>
+      <p class="formula">implied = TVL &times; category median (mcap/TVL) &times; growth &times; age &times; chains &times; discount</p>
+      <p class="formula-note">growth = 1 + clamp(7d change, &minus;15%, +25%) &divide; 100 &nbsp;·&nbsp;
+      age = 1 + min(years listed, 3) &times; 0.03 &nbsp;·&nbsp;
+      chains = 1 + min(chains &minus; 1, 4) &times; 0.02 &nbsp;·&nbsp;
+      discount = 0.10 for CEX / Bridge / Liquid Staking &amp; co, 0.25 for versioned or wrapped names, else 1.00</p>
+    </section>
+  </section>
+  <section id="detail-view" hidden></section>
+</main>
+<footer class="wrap">
+  <p>Data: the sealed 2026-11-14 DefiLlama snapshot (758 protocols at or above $5M TVL).
+  Implied values are this radar&rsquo;s own estimates from that snapshot — not predictions
+  that a token will launch, or what it would be worth if it did. Nothing here is financial advice.</p>
+</footer>
+<script src="../data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
