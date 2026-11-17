@@ -228,7 +228,7 @@ function el(tag, attrs, children) {
 
 // ---------------------------------------------------------------- page state
 
-var DATA = window.RADAR;
+var DATA = (typeof window !== 'undefined' && window.RADAR) ? window.RADAR : null;
 var state = { q: '', cat: '', chain: '', minTvl: 0, watch: false, likely: false, sort: 'rank', dir: 1 };
 
 function filteredRows() {
