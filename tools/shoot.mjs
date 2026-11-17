@@ -33,8 +33,19 @@ function serve(root) {
   return new Promise((resolve) => {
     const server = createServer((req, res) => {
       const url = decodeURIComponent((req.url ?? '/').split('?')[0]);
-      const path = join(root, url === '/' ? 'dashboard/index.html' : url);
-      if (!path.startsWith(root) || !existsSync(path) || !statSync(path).isFile()) {
+      if (url === '/favicon.ico') {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+      let path = join(root, url === '/' ? 'dashboard/index.html' : url);
+      if (!path.startsWith(root) || !existsSync(path)) {
+        res.writeHead(404);
+        res.end('not found');
+        return;
+      }
+      if (statSync(path).isDirectory()) path = join(path, 'index.html');
+      if (!existsSync(path) || !statSync(path).isFile()) {
         res.writeHead(404);
         res.end('not found');
         return;
@@ -80,9 +91,9 @@ try {
     const path = join(shotsDir, name);
     await setup();
     await new Promise((r) => setTimeout(r, 1200));
-    let shot = await page.screenshot({ path, type: 'png' });
+    let shot = Buffer.from(await page.screenshot({ path, type: 'png' }));
     if (shot.length > MAX_BYTES) {
-      shot = await page.screenshot({ path, type: 'jpeg', quality: 82 });
+      shot = Buffer.from(await page.screenshot({ path, type: 'jpeg', quality: 82 }));
       console.log(`${name}: PNG was over the cap, retook as JPEG (${shot.length} bytes)`);
     }
     const dims = shot[0] === 0x89 ? pngSize(shot) : { width: 1440, height: 900 };
@@ -103,7 +114,7 @@ try {
     await page.evaluate(() => {
       const heads = [...document.querySelectorAll('#detail-view h3')];
       const target = heads.find((h) => h.textContent.indexOf('Implied value') === 0);
-      if (target) window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - 130));
+      if (target) window.scrollTo(0, Math.max(0, target.getBoundingClientRect().top + window.scrollY - 360));
     });
   });
 
@@ -124,6 +135,9 @@ try {
       { timeout: 30000 },
     );
   });
+} catch (e) {
+  if (errors.length > 0) process.stderr.write(`page errors before failure:\n${errors.map((x) => `  ${x}`).join('\n')}\n`);
+  throw e;
 } finally {
   if (browser) await browser.close();
   server.close();
