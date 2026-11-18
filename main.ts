@@ -97,8 +97,17 @@ writeFileSync(
 );
 
 const watchlistRows = board.filter((r) => r.watchlist).length;
+const loo = radar.validation.loo;
+const wf = radar.validation.walk_forward;
+const flat = radar.validation.flat_multiple;
+const vc1k = radar.verdict_counts['1000'];
+const vc10k = radar.verdict_counts['10000'];
 process.stdout.write(
   `token radar: ${snapshot.protocols.length} protocols, ${snapshot.watchlist.length} on the watchlist, ${board.length} rows ranked (${watchlistRows} watchlist, ${board.length - watchlistRows} below the floor)\n` +
-    `token radar: implied value $${board[0]!.implied_value_usd.toLocaleString('en-US')} at rank 1 down to $${board[board.length - 1]!.implied_value_usd.toLocaleString('en-US')} at rank ${board.length}\n` +
+    `token radar: implied value $${board[0]!.implied_value_usd.toLocaleString('en-US')} at rank 1 down to $${board[board.length - 1]!.implied_value_usd.toLocaleString('en-US')} at rank ${board.length}, total $${radar.total_implied_usd.toLocaleString('en-US')}\n` +
+    `token radar: fit log10(mcap) = ${radar.fit.intercept} + ${radar.fit.slope} * log10(TVL) on ${radar.fit.n} traded tokens\n` +
+    `token radar: LOO median miss ${loo.median_miss}x, ${(loo.within_3x * 100).toFixed(1)}% within 3x, rank corr ${loo.rank_corr}, ${(loo.in_p25_p75 * 100).toFixed(1)}% of holdout caps in P25-P75, ${(loo.in_p10_p90 * 100).toFixed(1)}% in P10-P90 (flat multiple: ${flat.median_miss}x)\n` +
+    `token radar: walk-forward median miss ${wf.median_miss}x, ${(wf.within_3x * 100).toFixed(1)}% within 3x, rank corr ${wf.rank_corr} (train ${wf.train}, test ${wf.test}, cut ${wf.cut})\n` +
+    `token radar: verdicts at $1,000: FARM ${vc1k.FARM} / MARGINAL ${vc1k.MARGINAL} / SKIP ${vc1k.SKIP}; at $10,000: FARM ${vc10k.FARM} / MARGINAL ${vc10k.MARGINAL} / SKIP ${vc10k.SKIP}\n` +
     `token radar: wrote ${join(outDir, 'board.json')}, ${join(outDir, 'data.js')}, ${join(outDir, 'dashboard')} (${dashboardFiles.length} files), ${join(outDir, 'screenshots')} (${shotNames.length} images) and ${join(outDir, 'dossier.json')}\n`,
 );
