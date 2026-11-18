@@ -118,22 +118,28 @@ try {
     });
   });
 
-  // 3 — the board filtered to one category, visibly different from shot 1.
+  // 3 — the board filtered to one category and one verdict, visibly different from shot 1.
   await capture('3-filtered.png', async () => {
     await page.goto(`${base}/dashboard/`, { waitUntil: 'networkidle0', timeout: 60000 });
     await page.waitForSelector('#rows tr', { timeout: 30000 });
     await page.evaluate(() => {
-      const sel = document.getElementById('f-cat');
-      sel.value = 'Dexs';
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-      const likely = document.getElementById('f-likely');
-      likely.checked = true;
-      likely.dispatchEvent(new Event('change', { bubbles: true }));
+      const cat = document.getElementById('f-cat');
+      cat.value = 'Dexs';
+      cat.dispatchEvent(new Event('change', { bubbles: true }));
+      const verdict = document.getElementById('f-verdict');
+      verdict.value = 'FARM';
+      verdict.dispatchEvent(new Event('change', { bubbles: true }));
     });
     await page.waitForFunction(
-      () => document.getElementById('count').textContent.indexOf(' of 342 ') >= 0 && !document.getElementById('count').textContent.startsWith('342 '),
+      () => !document.getElementById('count').textContent.startsWith('197 of '),
       { timeout: 30000 },
     );
+    // Scroll the filter bar and the filtered table into view: the shot
+    // must show the filter state, not the same page top as shot 1.
+    await page.evaluate(() => {
+      document.getElementById('controls').scrollIntoView({ block: 'start' });
+      window.scrollBy(0, -12);
+    });
   });
 } catch (e) {
   if (errors.length > 0) process.stderr.write(`page errors before failure:\n${errors.map((x) => `  ${x}`).join('\n')}\n`);

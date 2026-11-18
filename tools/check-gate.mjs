@@ -137,6 +137,27 @@ let board;
   check('page farm steps match board.json', mismatches === 0, `${board.length - mismatches}/${board.length} rows identical` + (mismatches ? ` first mismatch: ${first}` : ''));
 }
 
+// --- 7c. page agreement: app.js econFor vs board.json (both deposits) -----
+{
+  const app = require(join(outDir, 'dashboard', 'app.js'));
+  let mismatches = 0;
+  let first = '';
+  for (const row of board) {
+    for (const dep of [1000, 10000]) {
+      const page = app.econFor(row, dep);
+      const boardEcon = dep === 1000 ? row.farm_1000 : row.farm_10000;
+      const same = ['cost_usd', 'slice_usd', 'net_usd', 'net_per_hour_usd', 'breakeven_odds', 'verdict']
+        .every((k) => page[k] === boardEcon[k]);
+      if (!same) {
+        mismatches++;
+        if (!first) first = `${row.slug}@$${dep}`;
+        break;
+      }
+    }
+  }
+  check('page farm economics match board.json', mismatches === 0, `${board.length - mismatches}/${board.length} rows identical at both deposits` + (mismatches ? ` first mismatch: ${first}` : ''));
+}
+
 // --- 7b. data.js carries the same rows ------------------------------------
 {
   const text = readFileSync(join(outDir, 'data.js'), 'utf8');
@@ -236,6 +257,39 @@ function imageSize(buf, name) {
   }
   check('determinism (two runs byte-identical)', ok, detail);
   for (const d of [tmpA, tmpB]) rmSync(d, { recursive: true, force: true });
+}
+
+// --- 8. model agreement: accounting, bands, verdict counts ---------------
+{
+  const text = readFileSync(join(outDir, 'data.js'), 'utf8');
+  const prefix = 'window.RADAR=';
+  const data = JSON.parse(text.slice(prefix.length, -2));
+  const problems = [];
+  const a = data.accounting;
+  if (a.ranked + a.already_trade + a.token_recorded_no_mcap + a.set_aside !== a.total) {
+    problems.push(`accounting sums to ${a.ranked + a.already_trade + a.token_recorded_no_mcap + a.set_aside}, not ${a.total}`);
+  }
+  if (a.ranked !== board.length) problems.push(`accounting ranked ${a.ranked} != board ${board.length}`);
+  for (const r of board) {
+    if (!(r.band_p10_usd <= r.implied_value_usd && r.implied_value_usd <= r.band_p90_usd)) problems.push(`${r.slug}: implied outside P10-P90`);
+    if (!(r.rank_lo <= r.rank && r.rank <= r.rank_hi)) problems.push(`${r.slug}: rank outside rank range`);
+    if (r.band_p10_usd <= 0 || r.band_p90_usd <= r.band_p10_usd) problems.push(`${r.slug}: bad band`);
+  }
+  for (const dep of ['1000', '10000']) {
+    const counts = { FARM: 0, MARGINAL: 0, SKIP: 0 };
+    for (const r of board) counts[r[dep === '1000' ? 'farm_1000' : 'farm_10000'].verdict]++;
+    const meta = data.verdict_counts[dep];
+    if (counts.FARM !== meta.FARM || counts.MARGINAL !== meta.MARGINAL || counts.SKIP !== meta.SKIP) {
+      problems.push(`verdict counts @$${dep} differ from meta`);
+    }
+  }
+  const v = data.validation;
+  if (!(v.loo.median_miss > 0 && v.loo.within_3x >= 0 && v.loo.within_3x <= 1 && v.walk_forward.median_miss > 0)) {
+    problems.push('validation numbers out of range');
+  }
+  check('model agreement (accounting, bands, verdicts)', problems.length === 0,
+    `${a.ranked} ranked + ${a.already_trade} trade + ${a.token_recorded_no_mcap} token-no-mcap + ${a.set_aside} set aside = ${a.total}` +
+    `; LOO ${v.loo.median_miss}x, walk-forward ${v.walk_forward.median_miss}x` + (problems.length ? ` — ${problems.slice(0, 3).join('; ')}` : ''));
 }
 
 const failed = results.filter((r) => !r.ok).length;
