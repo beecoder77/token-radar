@@ -16,13 +16,12 @@
         <p class="tagline">Every protocol that could plausibly launch a token, ranked by what its token would be worth.</p>
       </div>
     </div>
-    <dl class="stats" id="stats"></dl>
+    <dl class="kpis" id="kpis"></dl>
   </div>
 </header>
 <main class="wrap">
   <section id="board-view">
     <p class="seal" id="seal">Checking this page against board.json&hellip;</p>
-    <p class="strip" id="accounting-strip"></p>
     <section class="panel" id="validation">
       <h2>The model, tested on the snapshot itself</h2>
       <p id="fit-line"></p>
@@ -30,7 +29,6 @@
         <div class="chart" id="chart"></div>
         <div class="valgrid" id="valgrid"></div>
       </div>
-      <p class="fine" id="chart-note"></p>
     </section>
     <div class="controls" id="controls">
       <label class="ctl search">Search
@@ -65,27 +63,40 @@
       </span>
       <span class="count" id="count"></span>
     </div>
-    <p class="hint">Click a column header to sort. Click a row for the protocol&rsquo;s value breakdown, farm economics and farm plan. The deposit buttons re-price every verdict on this page.</p>
     <div class="tablewrap">
       <table id="board">
+        <colgroup>
+          <col class="c-rank"><col class="c-name"><col class="c-tvl"><col class="c-7d"><col class="c-age"><col class="c-val"><col class="c-band"><col class="c-odds"><col class="c-slice"><col class="c-net"><col class="c-be"><col class="c-hour"><col class="c-verdict"><col class="c-plan">
+        </colgroup>
         <thead>
           <tr>
             <th data-sort="rank" class="num">Rank</th>
             <th data-sort="name">Protocol</th>
-            <th data-sort="category">Category</th>
-            <th data-sort="chains">Chains</th>
             <th data-sort="tvl_usd" class="num">TVL</th>
             <th data-sort="change_7d" class="num">7d</th>
             <th data-sort="age_days" class="num">Age</th>
             <th data-sort="implied_value_usd" class="num">Implied value</th>
-            <th class="num">P10&ndash;P90</th>
+            <th data-sort="band_p10_usd" class="num">P10&ndash;P90</th>
             <th data-sort="launch_odds" class="num">Launch odds</th>
+            <th data-sort="slice_usd" class="num">Slice</th>
+            <th data-sort="net_usd" class="num">Net if launch</th>
+            <th data-sort="breakeven_odds" class="num">Break-even</th>
+            <th data-sort="net_per_hour_usd" class="num">Net / hour</th>
             <th data-sort="verdict" class="num">Verdict</th>
+            <th>Farm plan</th>
           </tr>
         </thead>
         <tbody id="rows"></tbody>
       </table>
     </div>
+    <section class="panel" id="ablation">
+      <h2>What each part of the model earns — out of sample</h2>
+      <p id="ablation-line"></p>
+      <table class="mini" id="ablation-table">
+        <thead><tr><th>Model</th><th class="num">LOO miss</th><th class="num">Within 3&times;</th><th class="num">Rank &rho;</th><th class="num">Walk-fwd miss</th><th class="num">Within 3&times;</th><th class="num">Rank &rho;</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </section>
     <section class="panel" id="accounting">
       <h2>All 758 protocols, accounted for</h2>
       <p id="accounting-line"></p>
@@ -97,16 +108,10 @@
     <section class="explainer" id="how">
       <h2>How a value is built</h2>
       <p>Each protocol&rsquo;s implied value comes from the snapshot itself, never from a
-      hand-picked list of names. The market already prices token-bearing protocols:
-      <strong>impliedValue()</strong> fits <span id="fit-eq"></span> on the traded
+      hand-picked list of names. <strong>impliedValue()</strong> fits <span id="fit-eq"></span> on the traded
       protocols in launchable categories, then multiplies the curve by a shrunk
       category offset, by 7-day TVL growth, by seasoning (how long it has run with
-      no token) and by chain breadth. The curve flattens — market cap grows
-      sub-linearly with TVL — so a $2.76B-TVL protocol is worth tens of millions,
-      not half a billion. <strong>looCheck()</strong> and <strong>walkForwardCheck()</strong>
-      test the fit out of sample on the traded tokens (panel above), and
-      <strong>bootstrapBands()</strong> runs 200 refits for every row&rsquo;s P10&ndash;P90
-      band and rank range. The bands are prediction intervals — curve uncertainty
+      no token) and by chain breadth. The bands are prediction intervals — curve uncertainty
       plus the scatter between protocols — so they are wide: the ranking, not the
       point value, is the signal. <strong>farmPlan()</strong> writes each protocol&rsquo;s
       concrete steps with their dollar cost and minutes, and <strong>verdictFor()</strong>

@@ -108,6 +108,9 @@ process.stdout.write(
     `token radar: fit log10(mcap) = ${radar.fit.intercept} + ${radar.fit.slope} * log10(TVL) on ${radar.fit.n} traded tokens\n` +
     `token radar: LOO median miss ${loo.median_miss}x, ${(loo.within_3x * 100).toFixed(1)}% within 3x, rank corr ${loo.rank_corr}, ${(loo.in_p25_p75 * 100).toFixed(1)}% of holdout caps in P25-P75, ${(loo.in_p10_p90 * 100).toFixed(1)}% in P10-P90 (flat multiple: ${flat.median_miss}x)\n` +
     `token radar: walk-forward median miss ${wf.median_miss}x, ${(wf.within_3x * 100).toFixed(1)}% within 3x, rank corr ${wf.rank_corr} (train ${wf.train}, test ${wf.test}, cut ${wf.cut})\n` +
+    `token radar: ablation (LOO miss): ${radar.ablation.map((a) => `${a.stage} ${a.loo_median_miss}x`).join(' / ')}\n` +
+    `token radar: held-out launch odds: ${radar.launch_odds_heldout.called_right} of ${radar.launch_odds_heldout.n} later-listed traded tokens flagged likely (odds >= ${radar.launch_odds_heldout.threshold}), cut ${radar.launch_odds_heldout.cut}\n` +
+    `token radar: best net per active hour (watchlist, $1,000): ${radar.best_net_per_hour.map((b) => `${b.name} $${b.net_per_hour_usd}/h`).join(' · ')}\n` +
     `token radar: verdicts at $1,000: FARM ${vc1k.FARM} / MARGINAL ${vc1k.MARGINAL} / SKIP ${vc1k.SKIP}; at $10,000: FARM ${vc10k.FARM} / MARGINAL ${vc10k.MARGINAL} / SKIP ${vc10k.SKIP}\n` +
     `token radar: wrote ${join(outDir, 'board.json')}, ${join(outDir, 'data.js')}, ${join(outDir, 'dashboard')} (${dashboardFiles.length} files), ${join(outDir, 'screenshots')} (${shotNames.length} images) and ${join(outDir, 'dossier.json')}\n`,
 );
