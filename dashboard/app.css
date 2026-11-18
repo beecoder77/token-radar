@@ -148,6 +148,10 @@ table.mini th { cursor: default; text-transform: none; letter-spacing: 0; }
 table.mini th, table.mini td { white-space: normal; }
 table.mini tbody tr { cursor: default; }
 table.mini tbody tr:hover { background: transparent; }
+#ablation-table td.stage { font-weight: 600; color: var(--ink); }
+#ablation-table tr.full td { background: #16233d; font-weight: 650; }
+#ablation-table tr.full td.stage { color: var(--gold-soft); }
+#bestfarms-table td.name { font-weight: 600; color: var(--ink); }
 .steps { margin: 0; padding-left: 22px; }
 .steps li { margin: 0 0 10px; padding-left: 4px; }
 .steps li::marker { color: var(--gold); font-weight: 700; }

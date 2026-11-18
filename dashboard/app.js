@@ -411,6 +411,69 @@ function renderChart() {
   $('chart').innerHTML = s;
 }
 
+// ---------------------------------------------------------------- ablation table
+
+/** One row per model term added: what the term earns, out of sample, on the 90 traded tokens. */
+function renderAblation() {
+  var v = DATA.validation;
+  $('ablation-line').textContent =
+    'Each row adds one term to the model and re-runs the same leave-one-out and walk-forward tests as the panel above (n=' + v.loo.n +
+    ' traded tokens; walk-forward trains on the ' + v.walk_forward.train + ' earliest-listed, tests the ' + v.walk_forward.test +
+    ' later-listed, cut ' + v.walk_forward.cut + '). The curve earns its keep over one flat multiple; the last row is the model this board uses.';
+  var tbody = document.querySelector('#ablation-table tbody');
+  DATA.ablation.forEach(function (a, i) {
+    var tr = document.createElement('tr');
+    if (i === DATA.ablation.length - 1) tr.className = 'full';
+    var cells = [
+      a.stage + (i === DATA.ablation.length - 1 ? ' — the board’s model' : ''),
+      a.loo_median_miss.toFixed(2) + '×',
+      Math.round(a.loo_within_3x * 100) + '%',
+      a.loo_rank_corr.toFixed(2),
+      a.wf_median_miss.toFixed(2) + '×',
+      Math.round(a.wf_within_3x * 100) + '%',
+      a.wf_rank_corr.toFixed(2),
+    ];
+    cells.forEach(function (c, j) {
+      var td = document.createElement('td');
+      if (j > 0) td.className = 'num';
+      if (j === 0) td.className = 'stage';
+      td.textContent = c;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
+// ---------------------------------------------------------------- best farms
+
+/** The three watchlist rows with the best net per active hour, at the $10,000
+ * deposit — the only deposit where all three clear FARM (at $1,000 the same
+ * three lead the watchlist but are MARGINAL / MARGINAL / SKIP: the slice
+ * scales with the square root of the deposit while the plan cost stays flat). */
+function renderBestFarms() {
+  var top = rows.filter(function (r) { return r.watchlist; })
+    .sort(function (a, b) { return b.farm_10000.net_per_hour_usd - a.farm_10000.net_per_hour_usd; }).slice(0, 3);
+  $('bestfarms-line').textContent =
+    'The three watchlist protocols with the best net per active hour at a $10,000 deposit. The same three lead the watchlist at $1,000 (' +
+    top.map(function (r) { return '+$' + Math.round(r.farm_1000.net_per_hour_usd) + '/h'; }).join(', ') +
+    ') but only clear FARM at $10,000.';
+  var tbody = document.querySelector('#bestfarms-table tbody');
+  top.forEach(function (r) {
+    var e = r.farm_10000;
+    var tr = document.createElement('tr');
+    [['name', r.name], ['num', usd(r.implied_value_usd)], ['num', Math.round(r.launch_odds * 100) + '%'],
+     ['num pos', '+$' + Math.round(e.net_usd)], ['num pos', '+$' + Math.round(e.net_per_hour_usd) + '/h'],
+     ['num', null]].forEach(function (c, i) {
+      var td = document.createElement('td');
+      td.className = c[0];
+      if (i === 5) td.innerHTML = pill(e.verdict);
+      else td.textContent = c[1];
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+}
+
 // ---------------------------------------------------------------- board table
 
 function filteredRows() {
@@ -758,6 +821,8 @@ function init() {
   renderStats();
   renderAccounting();
   renderValidation();
+  renderBestFarms();
+  renderAblation();
   renderFilters();
   sealCheck();
   $('q').addEventListener('input', function (e) { state.q = e.target.value; renderBoard(); });

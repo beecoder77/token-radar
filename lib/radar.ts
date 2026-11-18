@@ -188,6 +188,17 @@ export interface BoardRow {
   farm_steps: string[];
 }
 
+/** One row of the ablation table: what one added model term earns, out of sample. */
+export interface AblationRow {
+  stage: string;
+  loo_median_miss: number;
+  loo_within_3x: number;
+  loo_rank_corr: number;
+  wf_median_miss: number;
+  wf_within_3x: number;
+  wf_rank_corr: number;
+}
+
 /** A token-bearing protocol, for the dashboard's comparable-peers view. */
 export interface PeerRow {
   slug: string;
@@ -223,6 +234,7 @@ export interface RadarData {
     flat_multiple: { median_miss: number; within_3x: number };
     bootstrap_refits: number;
   };
+  ablation: AblationRow[];
   accounting: {
     total: number;
     ranked: number;
@@ -603,6 +615,114 @@ export function flatMultipleCheck(points: FitPoint[]): { median_miss: number; wi
     median_miss: Math.round(median(misses) * 100) / 100,
     within_3x: Math.round((misses.filter((m) => m <= 3).length / misses.length) * 1000) / 1000,
   };
+}
+
+/** One ablation stage: which model terms its prediction carries. */
+type AblationStage = 'flat' | 'ols' | 'huber' | 'offsets' | 'growth' | 'age' | 'full';
+
+const ABLATION_STAGES: { stage: AblationStage; label: string }[] = [
+  { stage: 'flat', label: 'Flat multiple' },
+  { stage: 'ols', label: 'Size curve (OLS)' },
+  { stage: 'huber', label: '+ Huber weights' },
+  { stage: 'offsets', label: '+ Family offsets' },
+  { stage: 'growth', label: '+ 7-day growth' },
+  { stage: 'age', label: '+ Listing age' },
+  { stage: 'full', label: '+ Chain breadth' },
+];
+
+/** The fit a stage needs from its training points: a curve, offsets, or one multiple. */
+function fitForStage(
+  stage: AblationStage,
+  points: FitPoint[],
+): { a: number; b: number; offsets: Map<string, { dex: number; peers: number }>; multiple: number } {
+  if (stage === 'flat') {
+    const multiple = median(points.map((p) => p.protocol.mcap_usd! / p.protocol.tvl_usd));
+    return { a: 0, b: 0, offsets: new Map(), multiple };
+  }
+  if (stage === 'ols') {
+    const { a, b } = ols(points);
+    return { a, b, offsets: new Map(), multiple: 0 };
+  }
+  if (stage === 'huber') {
+    const { a, b } = huberFit(points);
+    return { a, b, offsets: new Map(), multiple: 0 };
+  }
+  const model = fitModel(points);
+  return { a: model.a, b: model.b, offsets: model.offsets, multiple: 0 };
+}
+
+/** A protocol's predicted market cap under one ablation stage's fit. */
+function predictStage(
+  stage: AblationStage,
+  fit: ReturnType<typeof fitForStage>,
+  p: SnapshotProtocol,
+  asOf: string,
+): number {
+  if (stage === 'flat') return Math.max(1, Math.round(p.tvl_usd * fit.multiple));
+  let v = Math.pow(10, fit.a + fit.b * Math.log10(Math.max(p.tvl_usd, 1)));
+  if (stage === 'ols' || stage === 'huber') return Math.max(1, Math.round(v));
+  const offset = fit.offsets.get(p.category ?? '(none)') ?? { dex: 0, peers: 0 };
+  v *= Math.pow(10, offset.dex);
+  if (stage === 'offsets') return Math.max(1, Math.round(v));
+  v *= growthFactor(p);
+  if (stage === 'growth') return Math.max(1, Math.round(v));
+  v *= ageFactor(p, asOf);
+  if (stage === 'age') return Math.max(1, Math.round(v));
+  v *= chainFactor(p);
+  return Math.max(1, Math.round(v));
+}
+
+/** The dated fit points split the way walkForwardCheck splits them: earlier half trains, later half tests. */
+function walkForwardSplit(points: FitPoint[]): { train: FitPoint[]; test: FitPoint[]; cut: string } {
+  const dated = points.filter((p) => p.protocol.listed_at !== null).sort((a, b) => (a.protocol.listed_at! < b.protocol.listed_at! ? -1 : 1));
+  const half = Math.floor(dated.length / 2);
+  return { train: dated.slice(0, half), test: dated.slice(half), cut: dated.slice(half)[0]!.protocol.listed_at! };
+}
+
+/** One stage's LOO and walk-forward numbers, rounded exactly as looCheck rounds them. */
+function stageScores(stage: AblationStage, points: FitPoint[], asOf: string): Omit<AblationRow, 'stage'> {
+  const misses: number[] = [];
+  const preds: number[] = [];
+  const acts: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const rest = points.filter((_, j) => j !== i);
+    const predicted = predictStage(stage, fitForStage(stage, rest), points[i]!.protocol, asOf);
+    const actual = points[i]!.protocol.mcap_usd!;
+    misses.push(missRatio(predicted, actual));
+    preds.push(predicted);
+    acts.push(actual);
+  }
+  const { train, test } = walkForwardSplit(points);
+  const trainFit = fitForStage(stage, train);
+  const wfMisses: number[] = [];
+  const wfPreds: number[] = [];
+  const wfActs: number[] = [];
+  for (const p of test) {
+    const predicted = predictStage(stage, trainFit, p.protocol, asOf);
+    const actual = p.protocol.mcap_usd!;
+    wfMisses.push(missRatio(predicted, actual));
+    wfPreds.push(predicted);
+    wfActs.push(actual);
+  }
+  return {
+    loo_median_miss: Math.round(median(misses) * 100) / 100,
+    loo_within_3x: Math.round((misses.filter((m) => m <= 3).length / misses.length) * 1000) / 1000,
+    loo_rank_corr: Math.round(spearman(preds, acts) * 1000) / 1000,
+    wf_median_miss: Math.round(median(wfMisses) * 100) / 100,
+    wf_within_3x: Math.round((wfMisses.filter((m) => m <= 3).length / wfMisses.length) * 1000) / 1000,
+    wf_rank_corr: Math.round(spearman(wfPreds, wfActs) * 1000) / 1000,
+  };
+}
+
+/**
+ * ablationCheck(): one row per model term added, from the flat multiple
+ * up to the full model. Each row re-runs the same leave-one-out and
+ * walk-forward tests as looCheck() / walkForwardCheck(), so the last row
+ * — the full model, chain breadth included — reproduces their numbers
+ * exactly, and every earlier row shows what its term earns.
+ */
+export function ablationCheck(points: FitPoint[], asOf: string): AblationRow[] {
+  return ABLATION_STAGES.map(({ stage, label }) => ({ stage: label, ...stageScores(stage, points, asOf) }));
 }
 
 /**
@@ -1019,6 +1139,7 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
   const loo = looCheck(points, snapshot.as_of);
   const walkForward = walkForwardCheck(points, snapshot.as_of);
   const flat = flatMultipleCheck(points);
+  const ablation = ablationCheck(points, snapshot.as_of);
   const setAside = setAsideRows(snapshot);
   const counts = (key: 'farm_1000' | 'farm_10000'): { FARM: number; MARGINAL: number; SKIP: number } => {
     const c = { FARM: 0, MARGINAL: 0, SKIP: 0 };
@@ -1047,6 +1168,7 @@ export function buildRadar(snapshot: Snapshot): { board: BoardRow[]; radar: Rada
       flat_multiple: flat,
       bootstrap_refits: MODEL.bootstrap_refits,
     },
+    ablation,
     accounting: {
       total: snapshot.protocols.length,
       ranked: board.length,
